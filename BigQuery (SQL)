@@ -1,0 +1,504 @@
+❏ Tenemos 4 tablas: UserInfo, LoansOutstanding, LoansDetail, Default.
+
+➨ Procesar y preparar base de datos
+
+☑️ Identificando nulos | UserInfo
+
+SELECT
+  COUNT(*)
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.UserInfo`
+WHERE
+  last_month_salary IS NULL
+
+☑️ Identificando nulos | UserInfo
+
+SELECT
+  COUNT(*)
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.UserInfo`
+WHERE
+  number_dependents IS NULL
+
+☑️ Identificando duplicados | LoansOutstanding
+
+SELECT
+  user_id,
+  loan_type,
+  COUNT(*) AS cantidad
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.LoansOutstanding`
+GROUP BY
+  user_id,
+  loan_type
+
+☑️ View | UserInfo_limpia
+
+WITH
+  UserInfo_limpia AS (
+  SELECT
+    user_id,
+    age,
+    sex,
+    IFNULL(last_month_salary, 5200) AS last_month_salary_limpia,
+    IFNULL(number_dependents, 0) AS number_dependents_limpia
+  FROM
+    `proyecto-riesgorelativo-406715.Pruebas.UserInfo`
+  WHERE
+    age <= 89
+    AND user_id != 21096 )
+SELECT
+  *
+FROM
+  UserInfo_limpia;
+
+☑️ View | LoansOutstanding_NuevasVariables
+
+SELECT
+  user_id,
+  COUNT(DISTINCT loan_id) AS total_loans,
+  COUNTIF(REGEXP_CONTAINS(loan_type, '(?i)real estate')) AS real_estate,
+  COUNTIF(REGEXP_CONTAINS(loan_type, '(?i)other')) AS others
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.LoansOutstanding`
+GROUP BY
+  user_id
+
+☑️ View | LoansDetail_limpia
+
+WITH
+  LoansDetail_limpia AS (
+  SELECT
+    user_id,
+    more_90_days_overdue,
+    CASE
+      WHEN using_lines_not_secured_personal_assets > 1 THEN 1
+    ELSE
+    using_lines_not_secured_personal_assets
+  END
+    AS using_lines_limpia,
+    number_times_delayed_payment_loan_30_59_days,
+    number_times_delayed_payment_loan_60_89_days,
+    CASE
+      WHEN debt_ratio > 1 THEN 1
+    ELSE
+    debt_ratio
+  END
+    AS debt_ratio_limpia
+  FROM
+    `proyecto-riesgorelativo-406715.Pruebas.LoansDetail` )
+SELECT
+  *
+FROM
+  LoansDetail_limpia;
+
+☑️ Uniendo tablas | Default + LoansOutstanding_NuevasVariables
+
+SELECT
+  d.user_id,
+  d.default_flag,
+  lo.total_loans,
+  lo.real_estate,
+  lo.others
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Default` d
+LEFT JOIN
+  `proyecto-riesgorelativo-406715.Pruebas.LoansOutstanding_NuevasVariables` lo
+ON
+  d.user_id = lo.user_id
+
+☑️ Uniendo tablas | UserInfo_limpia + LoansDetail_limpia
+
+SELECT
+  ui.user_id,
+  ui.age,
+  ui.sex,
+  ui.last_month_salary_limpia,
+  ui.number_dependents_limpia,
+  ld.more_90_days_overdue,
+  ld.using_lines_limpia,
+  ld.number_times_delayed_payment_loan_30_59_days,
+  ld.debt_ratio_limpia,
+  ld.number_times_delayed_payment_loan_60_89_days
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.UserInfo_limpia` ui
+LEFT JOIN
+  `proyecto-riesgorelativo-406715.Pruebas.LoansDetail_limpia` ld
+ON
+  ui.user_id = ld.user_id
+
+✅ Se unen las view | UserLoansInfo + DefaultLoansOutstanding = UnionTablas   
+
+SELECT
+  ul.age,
+  ul.sex,
+  ul.last_month_salary_limpia,
+  ul.number_dependents_limpia,
+  ul.more_90_days_overdue,
+  ul.using_lines_limpia,
+  ul.number_times_delayed_payment_loan_30_59_days,
+  ul.debt_ratio_limpia,
+  dl.user_id,
+  dl.default_flag,
+  COALESCE(dl.total_loans, 0) AS total_loans,
+  COALESCE(dl.real_estate, 0) AS real_estate,
+  COALESCE(dl.others, 0) AS others,
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.UserLoansInfo` ul
+LEFT JOIN
+  `proyecto-riesgorelativo-406715.Pruebas.DefaultLoansOutstanding` dl
+ON
+  ul.user_id = dl.user_id
+WHERE
+  ul.user_id IS DISTINCT
+FROM
+  21096
+  AND ul.number_times_delayed_payment_loan_30_59_days < 96
+
+✅ View | Cuartiles
+
+WITH
+  Cuartiles AS (
+  SELECT
+    user_id,
+    default_flag,
+    NTILE(4) OVER (ORDER BY age) AS cuartil_age,
+    NTILE(4) OVER (ORDER BY debt_ratio_limpia) AS cuartil_debt_ratio,
+    NTILE(4) OVER (ORDER BY more_90_days_overdue) AS cuartil_more_90_days,
+    NTILE(4) OVER (ORDER BY number_times_delayed_payment_loan_30_59_days) AS cuartil_delayed_payment,
+    NTILE(4) OVER (ORDER BY using_lines_limpia) AS cuartil_secured_lines,
+    NTILE(4) OVER (ORDER BY total_loans) AS cuartil_total_loans,
+    NTILE(4) OVER (ORDER BY last_month_salary_limpia) AS cuartil_last_month_salary,
+    NTILE(4) OVER (ORDER BY number_dependents_limpia) AS cuartil_number_dependent
+  FROM
+    `proyecto-riesgorelativo-406715.Pruebas.UnionTablas` )
+SELECT
+  *,
+FROM
+  Cuartiles;
+
+✅ View | Riesgo_Relativo
+
+WITH Totals AS (
+  SELECT
+    COUNTIF(default_flag = 1) AS total_default_1,
+    COUNTIF(default_flag = 0) AS total_default_0
+  FROM `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`
+)
+SELECT
+  cuartil_last_month_salary AS cuartil,
+  'last_month_salary' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_last_month_salary IN (1, 2, 3, 4)
+GROUP BY cuartil_last_month_salary, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_delayed_payment AS cuartil,
+  'delayed_payment' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_delayed_payment IN (1, 2, 3, 4)
+GROUP BY cuartil_delayed_payment, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_debt_ratio AS cuartil,
+  'debt_ratio' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_debt_ratio IN (1, 2, 3, 4)
+GROUP BY cuartil_debt_ratio, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_age AS cuartil,
+  'age' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_age IN (1, 2, 3, 4)
+GROUP BY cuartil_age, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_more_90_days AS cuartil,
+  'more_90_days' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_more_90_days IN (1, 2, 3, 4)
+GROUP BY cuartil_more_90_days, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_number_dependent AS cuartil,
+  'number_dependet' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_number_dependent IN (1, 2, 3, 4)
+GROUP BY cuartil_number_dependent, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_secured_lines AS cuartil,
+  'secured_lines' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+        ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_secured_lines IN (1, 2, 3, 4)
+GROUP BY cuartil_secured_lines, total_default_1, total_default_0
+UNION ALL
+SELECT
+  cuartil_total_loans AS cuartil,
+  'total_loans' AS variables,
+  COUNTIF(default_flag = 1) / total_default_1 AS proporcion_malos_pagadores_1,
+  COUNTIF(default_flag = 0) / total_default_0 AS proporcion_buenos_pagadores_0,
+  (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) AS riesgo_relativo_malos_entre_buenos,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 'Mayor riesgo de ser mal pagador'
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 'Menor riesgo de ser mal pagador'
+    ELSE 'NO DEFINIDO'
+  END AS categoria,
+  CASE
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) > 1 THEN 1
+    WHEN (COUNTIF(default_flag = 1) / total_default_1) / (COUNTIF(default_flag = 0) / total_default_0) < 1 THEN 0
+    ELSE NULL 
+  END AS variable_dummy
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles`,
+  Totals
+WHERE cuartil_total_loans IN (1, 2, 3, 4)
+GROUP BY cuartil_total_loans, total_default_1, total_default_0;
+
+✅ View | TablaGeneral
+
+SELECT
+  ut.user_id,
+  ut.age,
+  ut.sex,
+  ut.number_dependents_limpia,
+  ut.default_flag,
+  ut.debt_ratio_limpia,
+  ut.last_month_salary_limpia,
+  ut.real_estate,
+  ut.others,
+  ut.total_loans,
+  ut.more_90_days_overdue,
+  ut.number_times_delayed_payment_loan_30_59_days,
+  ut.using_lines_limpia,
+  c.cuartil_age,
+  CASE
+    WHEN c.cuartil_age =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_age,
+  CASE
+    WHEN c.cuartil_age =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_age,
+  c.cuartil_number_dependent,
+  CASE
+    WHEN c.cuartil_number_dependent =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_number_dependent,
+  CASE
+    WHEN c.cuartil_number_dependent =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_number_dependent,
+  c.cuartil_last_month_salary,
+  CASE
+    WHEN c.cuartil_last_month_salary =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_last_month_salary,
+  CASE
+    WHEN c.cuartil_last_month_salary =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_last_month_salary,
+  c.cuartil_debt_ratio,
+  CASE
+    WHEN c.cuartil_debt_ratio =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_debt_ratio,
+  CASE
+    WHEN c.cuartil_debt_ratio =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_debt_ratio,
+  c.cuartil_delayed_payment,
+  CASE
+    WHEN c.cuartil_delayed_payment =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_delayed_payment,
+  CASE
+    WHEN c.cuartil_delayed_payment =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_delayed_payment,
+  c.cuartil_more_90_days,
+  CASE
+    WHEN c.cuartil_more_90_days =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_more_90_days,
+  CASE
+    WHEN c.cuartil_more_90_days =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_more_90_days,
+  c.cuartil_secured_lines,
+  CASE
+    WHEN c.cuartil_secured_lines =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_secured_lines,
+  CASE
+    WHEN c.cuartil_secured_lines =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_secured_lines,
+  c.cuartil_total_loans,
+  CASE
+    WHEN c.cuartil_total_loans =4 THEN 1
+  ELSE
+  0
+END
+  AS dummy_total_loans,
+  CASE
+    WHEN c.cuartil_total_loans =4 THEN 'riesgo de ser mal pagador'
+  ELSE
+  'menor riesgo de ser mal pagador'
+END
+  AS riesgo_total_loan,
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.UnionTablas` ut
+LEFT JOIN
+  `proyecto-riesgorelativo-406715.Pruebas.Cuartiles` c
+ON
+  ut.user_id = c.user_id
+______________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+✍ Consultas | Correlaciones
+
+SELECT
+  CORR(more_90_days_overdue, number_times_delayed_payment_loan_30_59_days) AS more_90days_30_59days,
+  CORR(total_loans,debt_ratio_limpia) AS total_loans_debt_ratio,
+  CORR(number_dependents_limpia, last_month_salary_limpia) AS number_dependents_last_month_salary,
+  CORR(age,last_month_salary_limpia) AS age_last_month_salary,
+  CORR(number_dependents_limpia, total_loans) AS number_dependents_total_loans,
+  CORR(number_times_delayed_payment_loan_30_59_days,default_flag) AS number_30_59_default_flag,
+  CORR(using_lines_limpia,default_flag) AS secured_default,
+FROM
+  `proyecto-riesgorelativo-406715.Pruebas.TablaGeneral`
+
+
