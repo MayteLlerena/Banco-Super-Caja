@@ -1,4 +1,4 @@
-# Análisis del riesgo relativo para el sector financiero
+# <h1 align="center"> Análisis del riesgo relativo para el sector financiero  </h1>
 
 El equipo de análisis de crédito del banco "Super Caja" enfrenta una carga de trabajo abrumadora, debido al aumento en las solicitudes de préstamos dada la reciente disminución de las tasas de interés en el mercado. La metodología manual actual para procesar solicitudes de préstamo se ha demostrado ineficiente y lenta, lo que afecta negativamente la eficacia y la rapidez del proceso. Además de la creciente preocupación por la tasa de incumplimiento en la industria financiera añade presión a los bancos para identificar y mitigar los riesgos asociados con el crédito.
 
@@ -8,7 +8,7 @@ Armar un score crediticio a partir de un análisis de datos y la evaluación del
 
 ## Insumos
 
-▪️ 
+▪️ El conjunto de datos está disponible para descargar en este enlace 'https://bit.ly/3PATJdK'
 
 ## Herramientas que se usaron para el análisis
 
