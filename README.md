@@ -30,7 +30,7 @@ Armar un score crediticio a partir de un análisis de datos y la evaluación del
 
 ▪️ Python
 
-### ¿Cuál fue el proceso de trabajo?
+## ¿Cuál fue el proceso de trabajo?
 
 ▪️ Procesar y preparar la base de datos, esto implica identificar, corregir o eliminar errores, inconsistencias y valores atípicos en los conjuntos de datos.
 
@@ -38,10 +38,13 @@ Armar un score crediticio a partir de un análisis de datos y la evaluación del
 
 ▪️ Crear un dashboard con Data Storytelling.
 
-### Chequea mis consultas en SQL
+## Chequea mis consultas en SQL
 
 ▪️ Aquí: 
 
-### Dashboard 
+## Dashboard en Looker Studio
 
-![Riesgo relativo]()
+![Análisis de la conducta de pago de clientes](https://raw.githubusercontent.com/MayteLlerena/Banco_Super_Caja/main/An%C3%A1lisis%20de%20la%20conducta%20de%20pago%20de%20clientes.png)
+![Predicción del comportamiento de pago](https://raw.githubusercontent.com/MayteLlerena/Banco_Super_Caja/main/Predicci%C3%B3n%20del%20comportamiento%20de%20pago.png)
+![Matriz de confusión y regresión logística](https://raw.githubusercontent.com/MayteLlerena/Banco_Super_Caja/main/Matriz%20de%20confusi%C3%B3n%20y%20regresi%C3%B3n%20log%C3%ADstica.png)
+
