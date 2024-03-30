@@ -34,13 +34,35 @@ Armar un score crediticio a partir de un análisis de datos y la evaluación del
 
 ▪️ Procesar y preparar la base de datos, esto implica identificar, corregir o eliminar errores, inconsistencias y valores atípicos en los conjuntos de datos.
 
-▪️ 
+▪️ Análisis exploratorio:
 
-▪️ Crear un dashboard con Data Storytelling.
+    ▫ Utilizar gráficos de barras en LookerStudio para visualizar variables categóricas.
+  
+    ▫ Aplicar medidas de tendencia central y de dispersión.
+  
+    ▫ Creación de histogramas o boxplot en LookerStudio para visualizar variables numéricas.
+  
+    ▫ Cálculo de cuartiles en BigQuery (SQL).
+  
+    ▫ Cálculo de correlación de variables numéricas en BigQuery (SQL).
+    
+▪️ Técnica estadística:
+
+    ▫ Calcular el riesgo relativo en cada grupo (Mal pagador, Buen pagador) de cada variable con respecto a la variable “default”.
+
+    ▫ Validación de hipótesis en Python:
+
+       - Los más jóvenes tienen un mayor riesgo de impago.
+       - Las personas con más cantidad de préstamos activos tienen mayor riesgo de ser malos pagadores.
+       - Las personas que han retrasado sus pagos por más de 90 días tienen mayor riesgo de ser malos pagadores.
+
+▪️ Crear un dashboard en Looker Studio.
+
+▪️ Comunicación de hallazgos con stakeholders.
 
 ## Chequea mis consultas en SQL
 
-▪️ Aquí: 
+▪️ Aquí 👉🏻 'https://bit.ly/3PH3KGp'
 
 ## Dashboard en Looker Studio
 
